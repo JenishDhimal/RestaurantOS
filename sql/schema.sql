@@ -1,6 +1,3 @@
-CREATE DATABASE IF NOT EXISTS restaurantos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE restaurantos;
-
 CREATE TABLE roles (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name ENUM('admin','staff','kitchen') NOT NULL UNIQUE

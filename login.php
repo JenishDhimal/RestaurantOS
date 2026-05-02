@@ -4,7 +4,7 @@
 session_start();
 
 if (!empty($_SESSION['user_id'])) {
-    require_once __DIR__ . '/../includes/auth.php';
+    require_once __DIR__ . '/includes/auth.php';
     header('Location: ' . role_home());
     exit;
 }
@@ -12,7 +12,7 @@ if (!empty($_SESSION['user_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once __DIR__ . '/../includes/db.php';
+    require_once __DIR__ . '/includes/db.php';
 
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['name']    = $row['name'];
             $_SESSION['role']    = $row['role'];
             db()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$row['id']]);
-            require_once __DIR__ . '/../includes/auth.php';
+            require_once __DIR__ . '/includes/auth.php';
             header('Location: ' . role_home());
             exit;
         }
