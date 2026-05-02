@@ -1,5 +1,6 @@
 Options -Indexes
 RewriteEngine On
+DirectoryIndex index.php
 
 # Redirect bare domain to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
