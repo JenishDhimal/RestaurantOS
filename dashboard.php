@@ -110,3 +110,250 @@ $activePage   = 'dashboard';
 
 require_once __DIR__ . '/includes/header.php';
 ?>
+<div class="row g-3 mb-4">
+
+  <div class="col-md-4">
+    <div class="stat-card">
+      <?php if ($ordersDelta !== null): ?>
+        <span class="stat-badge <?= $ordersDelta >= 0 ? 'badge-green' : 'badge-red' ?>">
+          <?= ($ordersDelta >= 0 ? '+' : '') . $ordersDelta ?>%
+        </span>
+      <?php endif; ?>
+      <div class="stat-icon" style="background:rgba(59,130,246,.12);color:#3b82f6;">
+        <i class="fa-solid fa-receipt"></i>
+      </div>
+      <div class="stat-value"><?= $ordersToday ?></div>
+      <div class="stat-label">Total Orders Today</div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="stat-card">
+      <?php if ($revenueDelta !== null): ?>
+        <span class="stat-badge <?= $revenueDelta >= 0 ? 'badge-green' : 'badge-red' ?>">
+          <?= ($revenueDelta >= 0 ? '+' : '') . $revenueDelta ?>%
+        </span>
+      <?php endif; ?>
+      <div class="stat-icon" style="background:rgba(16,185,129,.12);color:var(--green);">
+        <i class="fa-solid fa-dollar-sign"></i>
+      </div>
+      <div class="stat-value">$<?= number_format($revenueToday, 2) ?></div>
+      <div class="stat-label">Revenue Today</div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="stat-card">
+      <span class="stat-badge badge-yellow">Active</span>
+      <div class="stat-icon" style="background:rgba(245,158,11,.12);color:var(--yellow);">
+        <i class="fa-solid fa-hourglass-half"></i>
+      </div>
+      <div class="stat-value"><?= $pendingOrders ?></div>
+      <div class="stat-label">Pending Orders</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="row g-3 mb-4">
+
+  <div class="col-md-7">
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2>Weekly Revenue</h2>
+      </div>
+      <div class="section-card-body">
+        <div style="position:relative;height:200px;">
+          <canvas id="revenueChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="section-card h-100">
+      <div class="section-card-header">
+        <h2>Quick Actions</h2>
+      </div>
+      <div class="section-card-body">
+        <div class="row g-2">
+          <div class="col-6">
+            <a href="/orders.php" class="btn btn-outline-secondary w-100 text-start py-3">
+              <i class="fa-solid fa-plus me-2" style="color:var(--accent);"></i>New Order
+            </a>
+          </div>
+          <div class="col-6">
+            <a href="/bill.php" class="btn btn-outline-secondary w-100 text-start py-3">
+              <i class="fa-solid fa-file-invoice me-2" style="color:var(--accent);"></i>Generate Bill
+            </a>
+          </div>
+          <div class="col-6">
+            <a href="/kitchen.php" class="btn btn-outline-secondary w-100 text-start py-3">
+              <i class="fa-solid fa-kitchen-set me-2" style="color:var(--accent);"></i>Kitchen View
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Recent Orders ─────────────────────────────────── -->
+<div class="section-card mb-4">
+  <div class="section-card-header">
+    <h2>Recent Orders</h2>
+    <a href="/bill.php" class="btn btn-sm btn-outline-secondary">View All</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="ros-table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Table</th>
+          <th>Items</th>
+          <th>Amount</th>
+          <th>Time</th>
+          <th>Status</th>
+          <th>Server</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($recentOrders as $o): ?>
+        <tr>
+          <td>
+            <?php if (in_array($o['status'], ['Ready','Paid'])): ?>
+              <a href="/bill-view.php?order_id=<?= (int)$o['id'] ?>" class="fw-bold" style="color:var(--accent);text-decoration:none;">#<?= (int)$o['id'] ?></a>
+            <?php else: ?>
+              <strong>#<?= (int)$o['id'] ?></strong>
+            <?php endif; ?>
+          </td>
+          <td><?= htmlspecialchars($o['table_number'] ?? 'Takeaway') ?></td>
+          <td><?= (int)$o['item_count'] ?> items</td>
+          <td>$<?= number_format($o['amount'], 2) ?></td>
+          <td><?= time_ago($o['created_at']) ?></td>
+          <td>
+            <span class="status-badge <?= status_class($o['status']) ?>">
+              <?= htmlspecialchars($o['status']) ?>
+            </span>
+          </td>
+          <td><?= htmlspecialchars($o['server_name']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (empty($recentOrders)): ?>
+        <tr><td colspan="7" class="text-center text-muted py-4">No orders yet.</td></tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Analytics filter + charts ─────────────────── -->
+<form method="GET" class="analytics-filter mb-3" id="rangeForm">
+  <span class="af-label">Analytics range:</span>
+  <div class="af-quick">
+    <button type="button" class="af-btn" data-days="0">Today</button>
+    <button type="button" class="af-btn" data-days="6">Week</button>
+    <button type="button" class="af-btn" data-days="29">Month</button>
+  </div>
+  <div class="af-custom">
+    <input type="date" name="from" id="af-from" class="form-control form-control-sm"
+           value="<?= htmlspecialchars($rangeFrom) ?>">
+    <span style="color:var(--text-light);font-size:13px;">to</span>
+    <input type="date" name="to" id="af-to" class="form-control form-control-sm"
+           value="<?= htmlspecialchars($rangeTo) ?>">
+    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+  </div>
+</form>
+
+<div class="row g-3 mb-4">
+
+  <!-- Order Type Donut -->
+  <div class="col-md-4">
+    <div class="section-card h-100">
+      <div class="section-card-header">
+        <h2>Order Types</h2>
+        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+      </div>
+      <div class="section-card-body d-flex flex-column align-items-center justify-content-center" style="min-height:200px;">
+        <canvas id="orderTypeChart" style="max-height:180px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Method Donut -->
+  <div class="col-md-4">
+    <div class="section-card h-100">
+      <div class="section-card-header">
+        <h2>Payment Methods</h2>
+        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+      </div>
+      <div class="section-card-body d-flex flex-column align-items-center justify-content-center" style="min-height:200px;">
+        <canvas id="payMethodChart" style="max-height:180px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Items Bar -->
+  <div class="col-md-4">
+    <div class="section-card h-100">
+      <div class="section-card-header">
+        <h2>Top 5 Items</h2>
+        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+      </div>
+      <div class="section-card-body" style="min-height:200px;">
+        <canvas id="topItemsChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.analytics-filter {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:12px 18px;
+}
+.af-label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-light); white-space:nowrap; }
+.af-quick { display:flex; gap:6px; }
+.af-btn {
+  padding:5px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--border);
+  background:var(--bg-main); font-size:12px; font-weight:600; color:var(--text-secondary);
+  cursor:pointer; transition:all .15s;
+}
+.af-btn:hover { border-color:var(--accent); color:var(--accent); }
+.af-custom { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.af-range-label { font-size:11px; color:var(--text-light); white-space:nowrap; }
+</style>
+
+<!-- Chart.js data from PHP -->
+<script>
+const weekLabels    = <?= json_encode(array_column($weekRevenue, 'label')) ?>;
+const weekValues    = <?= json_encode(array_column($weekRevenue, 'value')) ?>;
+const orderTypeLbls = <?= json_encode(['Dine-In', 'Takeaway']) ?>;
+const orderTypeVals = <?= json_encode([$orderTypeCounts['dine-in'], $orderTypeCounts['takeaway']]) ?>;
+const methodLbls    = <?= json_encode(['Cash', 'Card', 'Digital']) ?>;
+const methodVals    = <?= json_encode([$methodCounts['cash'], $methodCounts['card'], $methodCounts['digital']]) ?>;
+const topItemLbls   = <?= json_encode(array_column($topItems, 'name')) ?>;
+const topItemVals   = <?= json_encode(array_map(fn($r) => (int)$r['total_qty'], $topItems)) ?>;
+</script>
+
+<script>
+(function () {
+  const afFrom = document.getElementById('af-from');
+  const afTo   = document.getElementById('af-to');
+  document.querySelectorAll('.af-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const days = parseInt(btn.dataset.days);
+      const to   = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - days);
+      afFrom.value = from.toISOString().slice(0,10);
+      afTo.value   = to.toISOString().slice(0,10);
+      document.getElementById('rangeForm').submit();
+    });
+  });
+})();
+</script>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>
