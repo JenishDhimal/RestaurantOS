@@ -1,25 +1,30 @@
 :root {
-  --accent:        #E85D04;
-  --accent-dark:   #C44A00;
-  --accent-light:  #FF8C42;
-  --sidebar-bg:    #1a1a2e;
+  --accent: #E85D04;
+  --accent-dark: #C44A00;
+  --accent-light: #FF8C42;
+  --sidebar-bg: #1a1a2e;
   --sidebar-hover: #16213e;
-  --text-primary:  #1a1a2e;
-  --text-secondary:#6b7280;
-  --text-light:    #9ca3af;
-  --bg-main:       #f8f7f4;
-  --bg-card:       #ffffff;
-  --border:        #e5e7eb;
-  --green:         #10b981;
-  --yellow:        #f59e0b;
-  --red:           #ef4444;
-  --shadow-sm:     0 1px 3px rgba(0,0,0,.08);
-  --shadow-md:     0 4px 16px rgba(0,0,0,.10);
-  --radius:        12px;
-  --radius-sm:     8px;
+  --text-primary: #1a1a2e;
+  --text-secondary: #6b7280;
+  --text-light: #9ca3af;
+  --bg-main: #f8f7f4;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+  --green: #10b981;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, .10);
+  --radius: 12px;
+  --radius-sm: 8px;
 }
 
-*, *::before, *::after { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   font-family: 'DM Sans', sans-serif;
   background: var(--bg-main);
@@ -31,29 +36,12 @@ body {
   background-color: var(--accent);
   border-color: var(--accent);
 }
-.btn-primary:hover, .btn-primary:focus {
+
+.btn-primary:hover,
+.btn-primary:focus {
   background-color: var(--accent-dark);
   border-color: var(--accent-dark);
 }
-.login-screen {
-  min-height: 100vh;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-}
-.login-card {
-  background: white; border-radius: 20px; padding: 48px 44px;
-  width: 420px; box-shadow: 0 24px 64px rgba(0,0,0,.4);
-}
-.login-logo { text-align: center; margin-bottom: 36px; }
-.login-logo .logo-icon {
-  width: 64px; height: 64px; background: var(--accent);
-  border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 28px; color: white; margin-bottom: 12px;
-}
-.login-logo h1 { font-family: 'Playfair Display', serif; font-size: 28px; }
-.login-logo p  { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
-
-
 
 .form-control:focus,
 .form-select:focus {
@@ -430,4 +418,49 @@ body {
 .status-paid {
   background: rgba(139, 92, 246, .12);
   color: #8b5cf6;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.login-card {
+  background: white;
+  border-radius: 20px;
+  padding: 48px 44px;
+  width: 420px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .4);
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.login-logo .logo-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--accent);
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: white;
+  margin-bottom: 12px;
+}
+
+.login-logo h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+}
+
+.login-logo p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 4px;
 }
