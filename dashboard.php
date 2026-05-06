@@ -66,10 +66,75 @@ for ($i = 6; $i >= 0; $i--) {
     $weekRevenue[] = ['label' => $label, 'value' => (float)$sum->fetchColumn()];
 }
 
-$rangeFrom = $_GET['from'] ?? date('Y-m-d', strtotime('-6 days'));
+$rangeFrom = $_GET['from'] ?? date('Y-m-d');
 $rangeTo   = $_GET['to']   ?? date('Y-m-d');
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeFrom)) $rangeFrom = date('Y-m-d', strtotime('-6 days'));
+if (isset($_GET['period'])) {
+    if ($_GET['period'] === 'today') {
+        $rangeFrom = date('Y-m-d');
+        $rangeTo   = date('Y-m-d');
+    } else if ($_GET['period'] === 'week') {
+        $rangeFrom = date('Y-m-d', strtotime('-6 days'));
+        $rangeTo   = date('Y-m-d');
+    } else if ($_GET['period'] === 'month') {
+        $rangeFrom = date('Y-m-d', strtotime('-29 days'));
+        $rangeTo   = date('Y-m-d');
+    }
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeFrom)) $rangeFrom = date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeTo))   $rangeTo   = date('Y-m-d');
+
+$ordersQuery = $pdo->prepare(
+    "SELECT COUNT(*) FROM orders WHERE DATE(created_at) BETWEEN ? AND ?"
+);
+$ordersQuery->execute([$rangeFrom, $rangeTo]);
+$ordersCount = $ordersQuery->fetchColumn();
+
+$revenueQuery = $pdo->prepare(
+    "SELECT COALESCE(SUM(p.amount), 0)
+     FROM payments p
+     JOIN orders o ON p.order_id = o.id
+     WHERE DATE(o.created_at) BETWEEN ? AND ?"
+);
+$revenueQuery->execute([$rangeFrom, $rangeTo]);
+$revenueTotal = $revenueQuery->fetchColumn();
+
+$pendingOrders = $pdo->query(
+    "SELECT COUNT(*) FROM orders WHERE status IN ('Received','Preparing')"
+)->fetchColumn();
+
+$recentOrders = $pdo->query(
+    "SELECT o.id, o.type, o.table_number, o.status, o.created_at,
+            COUNT(oi.id)                              AS item_count,
+            COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS amount,
+            u.name                                    AS server_name
+     FROM orders o
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     LEFT JOIN users u       ON u.id = o.staff_id
+     GROUP BY o.id
+     ORDER BY o.created_at DESC
+     LIMIT 10"
+)->fetchAll();
+
+$revenuePerDay = [];
+$currentDate = new DateTime($rangeFrom);
+$endDate = new DateTime($rangeTo);
+$interval = new DateInterval('P1D');
+$period = new DatePeriod($currentDate, $interval, $endDate->modify('+1 day'));
+
+$stmt = $pdo->prepare(
+    "SELECT COALESCE(SUM(p.amount), 0)
+     FROM payments p
+     JOIN orders o ON p.order_id = o.id
+     WHERE DATE(o.created_at) = ?"
+);
+
+foreach ($period as $date) {
+    $stmt->execute([$date->format('Y-m-d')]);
+    $revenuePerDay[] = [
+        'label' => $date->format('D'),
+        'value' => (float)$stmt->fetchColumn()
+    ];
+}
 
 $orderTypeRows = $pdo->prepare(
     "SELECT type, COUNT(*) AS cnt FROM orders
@@ -105,40 +170,49 @@ $topItemRows->execute([$rangeFrom, $rangeTo]);
 $topItems = $topItemRows->fetchAll();
 
 $pageTitle    = 'Dashboard';
-$pageSubtitle = 'Overview of today\'s restaurant operations';
+$pageSubtitle = 'Overview of restaurant operations';
 $activePage   = 'dashboard';
 
 require_once __DIR__ . '/includes/header.php';
 ?>
+
+<!-- ── Analytics filter ─────────────────── -->
+<form method="GET" class="analytics-filter mb-3" id="rangeForm">
+  <span class="af-label">Analytics range:</span>
+  <div class="af-quick">
+    <button type="submit" name="period" value="today" class="af-btn">Today</button>
+    <button type="submit" name="period" value="week" class="af-btn">Week</button>
+    <button type="submit" name="period" value="month" class="af-btn">Month</button>
+  </div>
+  <div class="af-custom">
+    <input type="date" name="from" id="af-from" class="form-control form-control-sm"
+           value="<?= htmlspecialchars($rangeFrom) ?>">
+    <span style="color:var(--text-light);font-size:13px;">to</span>
+    <input type="date" name="to" id="af-to" class="form-control form-control-sm"
+           value="<?= htmlspecialchars($rangeTo) ?>">
+    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+  </div>
+</form>
+
 <div class="row g-3 mb-4">
 
   <div class="col-md-4">
     <div class="stat-card">
-      <?php if ($ordersDelta !== null): ?>
-        <span class="stat-badge <?= $ordersDelta >= 0 ? 'badge-green' : 'badge-red' ?>">
-          <?= ($ordersDelta >= 0 ? '+' : '') . $ordersDelta ?>%
-        </span>
-      <?php endif; ?>
       <div class="stat-icon" style="background:rgba(59,130,246,.12);color:#3b82f6;">
         <i class="fa-solid fa-receipt"></i>
       </div>
-      <div class="stat-value"><?= $ordersToday ?></div>
-      <div class="stat-label">Total Orders Today</div>
+      <div class="stat-value"><?= $ordersCount ?></div>
+      <div class="stat-label">Total Orders</div>
     </div>
   </div>
 
   <div class="col-md-4">
     <div class="stat-card">
-      <?php if ($revenueDelta !== null): ?>
-        <span class="stat-badge <?= $revenueDelta >= 0 ? 'badge-green' : 'badge-red' ?>">
-          <?= ($revenueDelta >= 0 ? '+' : '') . $revenueDelta ?>%
-        </span>
-      <?php endif; ?>
       <div class="stat-icon" style="background:rgba(16,185,129,.12);color:var(--green);">
         <i class="fa-solid fa-dollar-sign"></i>
       </div>
-      <div class="stat-value">$<?= number_format($revenueToday, 2) ?></div>
-      <div class="stat-label">Revenue Today</div>
+      <div class="stat-value">$<?= number_format($revenueTotal, 2) ?></div>
+      <div class="stat-label">Total Revenue</div>
     </div>
   </div>
 
@@ -160,7 +234,8 @@ require_once __DIR__ . '/includes/header.php';
   <div class="col-md-7">
     <div class="section-card">
       <div class="section-card-header">
-        <h2>Weekly Revenue</h2>
+        <h2>Revenue Over Time</h2>
+        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
       </div>
       <div class="section-card-body">
         <div style="position:relative;height:200px;">
@@ -247,24 +322,6 @@ require_once __DIR__ . '/includes/header.php';
   </div>
 </div>
 
-<!-- ── Analytics filter + charts ─────────────────── -->
-<form method="GET" class="analytics-filter mb-3" id="rangeForm">
-  <span class="af-label">Analytics range:</span>
-  <div class="af-quick">
-    <button type="button" class="af-btn" data-days="0">Today</button>
-    <button type="button" class="af-btn" data-days="6">Week</button>
-    <button type="button" class="af-btn" data-days="29">Month</button>
-  </div>
-  <div class="af-custom">
-    <input type="date" name="from" id="af-from" class="form-control form-control-sm"
-           value="<?= htmlspecialchars($rangeFrom) ?>">
-    <span style="color:var(--text-light);font-size:13px;">to</span>
-    <input type="date" name="to" id="af-to" class="form-control form-control-sm"
-           value="<?= htmlspecialchars($rangeTo) ?>">
-    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
-  </div>
-</form>
-
 <div class="row g-3 mb-4">
 
   <!-- Order Type Donut -->
@@ -328,8 +385,8 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- Chart.js data from PHP -->
 <script>
-const weekLabels    = <?= json_encode(array_column($weekRevenue, 'label')) ?>;
-const weekValues    = <?= json_encode(array_column($weekRevenue, 'value')) ?>;
+const revenueLabels = <?= json_encode(array_column($revenuePerDay, 'label')) ?>;
+const revenueValues = <?= json_encode(array_column($revenuePerDay, 'value')) ?>;
 const orderTypeLbls = <?= json_encode(['Dine-In', 'Takeaway']) ?>;
 const orderTypeVals = <?= json_encode([$orderTypeCounts['dine-in'], $orderTypeCounts['takeaway']]) ?>;
 const methodLbls    = <?= json_encode(['Cash', 'Card', 'Digital']) ?>;
@@ -338,22 +395,6 @@ const topItemLbls   = <?= json_encode(array_column($topItems, 'name')) ?>;
 const topItemVals   = <?= json_encode(array_map(fn($r) => (int)$r['total_qty'], $topItems)) ?>;
 </script>
 
-<script>
-(function () {
-  const afFrom = document.getElementById('af-from');
-  const afTo   = document.getElementById('af-to');
-  document.querySelectorAll('.af-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const days = parseInt(btn.dataset.days);
-      const to   = new Date();
-      const from = new Date();
-      from.setDate(from.getDate() - days);
-      afFrom.value = from.toISOString().slice(0,10);
-      afTo.value   = to.toISOString().slice(0,10);
-      document.getElementById('rangeForm').submit();
-    });
-  });
-})();
-</script>
+
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

@@ -49,3 +49,71 @@ $pageSubtitle = 'View and print order receipts';
 $activePage   = 'billing';
 require_once __DIR__ . '/includes/header.php';
 ?>
+
+<form method="GET" class="d-flex align-items-center gap-3 mb-4 flex-wrap"
+      style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 18px;">
+  <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);">Filter by Date</span>
+  <input type="date" name="from" class="form-control form-control-sm" style="max-width:160px;" value="<?= htmlspecialchars($dateFrom) ?>">
+  <span style="color:var(--text-light);font-size:13px;">to</span>
+  <input type="date" name="to"   class="form-control form-control-sm" style="max-width:160px;" value="<?= htmlspecialchars($dateTo) ?>">
+  <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+  <?php if ($isFiltered): ?>
+  <a href="/bill.php" class="btn btn-sm btn-outline-secondary">Clear</a>
+  <?php endif; ?>
+  <a href="/bill.php?from=<?= date('Y-m-d') ?>&to=<?= date('Y-m-d') ?>" class="btn btn-sm btn-outline-secondary">Today</a>
+  <a href="/bill.php?from=<?= date('Y-m-d', strtotime('-6 days')) ?>&to=<?= date('Y-m-d') ?>" class="btn btn-sm btn-outline-secondary">Last 7 Days</a>
+  <a href="/bill.php?from=<?= date('Y-m-01') ?>&to=<?= date('Y-m-d') ?>" class="btn btn-sm btn-outline-secondary">This Month</a>
+</form>
+
+<div class="section-card">
+  <div class="section-card-header">
+    <h2>Orders</h2>
+    <span style="font-size:13px;color:var(--text-secondary);"><?= count($orders) ?> order<?= count($orders) !== 1 ? 's' : '' ?><?= $isFiltered ? ' in range' : '' ?></span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="ros-table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Type</th>
+          <th>Table / Ref</th>
+          <th>Total</th>
+          <th>Time</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($orders as $o):
+          $sub   = (float)$o['subtotal'];
+          $total = $sub + ($gstEnabled ? round($sub * $gstRate / 100, 2) : 0);
+        ?>
+        <tr>
+          <td><strong>#<?= (int)$o['id'] ?></strong></td>
+          <td><?= $o['type'] === 'dine-in' ? 'Dine-in' : 'Takeaway' ?></td>
+          <td><?= htmlspecialchars($o['table_number'] ?? '—') ?></td>
+          <td><strong>$<?= number_format($total, 2) ?></strong></td>
+          <td style="color:var(--text-secondary);font-size:13px;"><?= time_ago($o['created_at']) ?></td>
+          <td>
+            <span class="status-badge <?= $o['status'] === 'Paid' ? 'status-paid' : 'status-ready' ?>">
+              <?= htmlspecialchars($o['status']) ?>
+            </span>
+          </td>
+          <td>
+            <?php if (in_array($o['status'], ['Ready','Paid'])): ?>
+              <a href="/bill-view.php?order_id=<?= (int)$o['id'] ?>" class="btn btn-sm btn-outline-secondary">View Bill</a>
+            <?php else: ?>
+              <span style="font-size:12px;color:var(--text-light);">In progress</span>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (empty($orders)): ?>
+        <tr><td colspan="7" class="text-center text-muted py-4">No orders found.</td></tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>
