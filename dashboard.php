@@ -66,8 +66,10 @@ for ($i = 6; $i >= 0; $i--) {
     $weekRevenue[] = ['label' => $label, 'value' => (float)$sum->fetchColumn()];
 }
 
-$rangeFrom = $_GET['from'] ?? date('Y-m-d');
-$rangeTo   = $_GET['to']   ?? date('Y-m-d');
+$rangeFrom  = $_GET['from'] ?? date('Y-m-d');
+$rangeTo    = $_GET['to']   ?? date('Y-m-d');
+$isAllTime  = false;
+$activePeriod = $_GET['period'] ?? '';
 if (isset($_GET['period'])) {
     if ($_GET['period'] === 'today') {
         $rangeFrom = date('Y-m-d');
@@ -78,6 +80,11 @@ if (isset($_GET['period'])) {
     } else if ($_GET['period'] === 'month') {
         $rangeFrom = date('Y-m-d', strtotime('-29 days'));
         $rangeTo   = date('Y-m-d');
+    } else if ($_GET['period'] === 'alltime') {
+        $earliest  = $pdo->query("SELECT COALESCE(MIN(DATE(created_at)), CURDATE()) FROM orders")->fetchColumn();
+        $rangeFrom = $earliest;
+        $rangeTo   = date('Y-m-d');
+        $isAllTime = true;
     }
 }
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeFrom)) $rangeFrom = date('Y-m-d');
@@ -98,6 +105,12 @@ $revenueQuery = $pdo->prepare(
 $revenueQuery->execute([$rangeFrom, $rangeTo]);
 $revenueTotal = $revenueQuery->fetchColumn();
 
+$expenseQuery = $pdo->prepare(
+    "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date BETWEEN ? AND ?"
+);
+$expenseQuery->execute([$rangeFrom, $rangeTo]);
+$expenseTotal = $expenseQuery->fetchColumn();
+
 $pendingOrders = $pdo->query(
     "SELECT COUNT(*) FROM orders WHERE status IN ('Received','Preparing')"
 )->fetchColumn();
@@ -116,24 +129,44 @@ $recentOrders = $pdo->query(
 )->fetchAll();
 
 $revenuePerDay = [];
-$currentDate = new DateTime($rangeFrom);
-$endDate = new DateTime($rangeTo);
-$interval = new DateInterval('P1D');
-$period = new DatePeriod($currentDate, $interval, $endDate->modify('+1 day'));
+$daysDiff = (strtotime($rangeTo) - strtotime($rangeFrom)) / 86400;
+$useMonthlyGrouping = $daysDiff > 60;
 
-$stmt = $pdo->prepare(
-    "SELECT COALESCE(SUM(p.amount), 0)
-     FROM payments p
-     JOIN orders o ON p.order_id = o.id
-     WHERE DATE(o.created_at) = ?"
-);
-
-foreach ($period as $date) {
-    $stmt->execute([$date->format('Y-m-d')]);
-    $revenuePerDay[] = [
-        'label' => $date->format('D'),
-        'value' => (float)$stmt->fetchColumn()
-    ];
+if ($useMonthlyGrouping) {
+    $monthlyStmt = $pdo->prepare(
+        "SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS month,
+                COALESCE(SUM(p.amount), 0) AS total
+         FROM payments p
+         JOIN orders o ON p.order_id = o.id
+         WHERE DATE(o.created_at) BETWEEN ? AND ?
+         GROUP BY month
+         ORDER BY month"
+    );
+    $monthlyStmt->execute([$rangeFrom, $rangeTo]);
+    foreach ($monthlyStmt->fetchAll() as $r) {
+        $revenuePerDay[] = [
+            'label' => date("M 'y", strtotime($r['month'] . '-01')),
+            'value' => (float)$r['total']
+        ];
+    }
+} else {
+    $currentDate = new DateTime($rangeFrom);
+    $endDate     = new DateTime($rangeTo);
+    $interval    = new DateInterval('P1D');
+    $period      = new DatePeriod($currentDate, $interval, $endDate->modify('+1 day'));
+    $stmt = $pdo->prepare(
+        "SELECT COALESCE(SUM(p.amount), 0)
+         FROM payments p
+         JOIN orders o ON p.order_id = o.id
+         WHERE DATE(o.created_at) = ?"
+    );
+    foreach ($period as $date) {
+        $stmt->execute([$date->format('Y-m-d')]);
+        $revenuePerDay[] = [
+            'label' => $date->format('D'),
+            'value' => (float)$stmt->fetchColumn()
+        ];
+    }
 }
 
 $orderTypeRows = $pdo->prepare(
@@ -180,9 +213,10 @@ require_once __DIR__ . '/includes/header.php';
 <form method="GET" class="analytics-filter mb-3" id="rangeForm">
   <span class="af-label">Analytics range:</span>
   <div class="af-quick">
-    <button type="submit" name="period" value="today" class="af-btn">Today</button>
-    <button type="submit" name="period" value="week" class="af-btn">Week</button>
-    <button type="submit" name="period" value="month" class="af-btn">Month</button>
+    <button type="submit" name="period" value="today"   class="af-btn<?= $activePeriod==='today'   ? ' af-btn-active' : '' ?>">Today</button>
+    <button type="submit" name="period" value="week"    class="af-btn<?= $activePeriod==='week'    ? ' af-btn-active' : '' ?>">Week</button>
+    <button type="submit" name="period" value="month"   class="af-btn<?= $activePeriod==='month'   ? ' af-btn-active' : '' ?>">Month</button>
+    <button type="submit" name="period" value="alltime" class="af-btn<?= $activePeriod==='alltime' ? ' af-btn-active' : '' ?>">All Time</button>
   </div>
   <div class="af-custom">
     <input type="date" name="from" id="af-from" class="form-control form-control-sm"
@@ -196,7 +230,7 @@ require_once __DIR__ . '/includes/header.php';
 
 <div class="row g-3 mb-4">
 
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(59,130,246,.12);color:#3b82f6;">
         <i class="fa-solid fa-receipt"></i>
@@ -206,7 +240,7 @@ require_once __DIR__ . '/includes/header.php';
     </div>
   </div>
 
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(16,185,129,.12);color:var(--green);">
         <i class="fa-solid fa-dollar-sign"></i>
@@ -216,7 +250,17 @@ require_once __DIR__ . '/includes/header.php';
     </div>
   </div>
 
-  <div class="col-md-4">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(239,68,68,.12);color:var(--red);">
+        <i class="fa-solid fa-arrow-trend-down"></i>
+      </div>
+      <div class="stat-value">$<?= number_format($expenseTotal, 2) ?></div>
+      <div class="stat-label">Total Expenses</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
     <div class="stat-card">
       <span class="stat-badge badge-yellow">Active</span>
       <div class="stat-icon" style="background:rgba(245,158,11,.12);color:var(--yellow);">
@@ -235,10 +279,10 @@ require_once __DIR__ . '/includes/header.php';
     <div class="section-card">
       <div class="section-card-header">
         <h2>Revenue Over Time</h2>
-        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+        <span class="af-range-label"><?= $isAllTime ? 'All Time' : htmlspecialchars($rangeFrom) . ' – ' . htmlspecialchars($rangeTo) ?></span>
       </div>
       <div class="section-card-body">
-        <div style="position:relative;height:200px;">
+        <div style="position:relative;height:160px;">
           <canvas id="revenueChart"></canvas>
         </div>
       </div>
@@ -329,7 +373,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="section-card h-100">
       <div class="section-card-header">
         <h2>Order Types</h2>
-        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+        <span class="af-range-label"><?= $isAllTime ? 'All Time' : htmlspecialchars($rangeFrom) . ' – ' . htmlspecialchars($rangeTo) ?></span>
       </div>
       <div class="section-card-body d-flex flex-column align-items-center justify-content-center" style="min-height:200px;">
         <canvas id="orderTypeChart" style="max-height:180px;"></canvas>
@@ -342,7 +386,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="section-card h-100">
       <div class="section-card-header">
         <h2>Payment Methods</h2>
-        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+        <span class="af-range-label"><?= $isAllTime ? 'All Time' : htmlspecialchars($rangeFrom) . ' – ' . htmlspecialchars($rangeTo) ?></span>
       </div>
       <div class="section-card-body d-flex flex-column align-items-center justify-content-center" style="min-height:200px;">
         <canvas id="payMethodChart" style="max-height:180px;"></canvas>
@@ -355,7 +399,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="section-card h-100">
       <div class="section-card-header">
         <h2>Top 5 Items</h2>
-        <span class="af-range-label"><?= htmlspecialchars($rangeFrom) ?> – <?= htmlspecialchars($rangeTo) ?></span>
+        <span class="af-range-label"><?= $isAllTime ? 'All Time' : htmlspecialchars($rangeFrom) . ' – ' . htmlspecialchars($rangeTo) ?></span>
       </div>
       <div class="section-card-body" style="min-height:200px;">
         <canvas id="topItemsChart"></canvas>
@@ -379,6 +423,7 @@ require_once __DIR__ . '/includes/header.php';
   cursor:pointer; transition:all .15s;
 }
 .af-btn:hover { border-color:var(--accent); color:var(--accent); }
+.af-btn-active { border-color:var(--accent) !important; color:var(--accent) !important; background:rgba(232,93,4,.08) !important; }
 .af-custom { display:flex; align-items:center; gap:8px; margin-left:auto; }
 .af-range-label { font-size:11px; color:var(--text-light); white-space:nowrap; }
 </style>
