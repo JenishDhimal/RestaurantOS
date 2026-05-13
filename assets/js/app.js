@@ -1,4 +1,30 @@
 document.addEventListener("DOMContentLoaded", function () {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  const toggleBtn = document.getElementById("sidebarToggle");
+
+  function openSidebar() {
+    sidebar && sidebar.classList.add("sidebar-open");
+    overlay && overlay.classList.add("active");
+  }
+  function closeSidebar() {
+    sidebar && sidebar.classList.remove("sidebar-open");
+    overlay && overlay.classList.remove("active");
+  }
+
+  toggleBtn && toggleBtn.addEventListener("click", function () {
+    sidebar && sidebar.classList.contains("sidebar-open") ? closeSidebar() : openSidebar();
+  });
+  overlay && overlay.addEventListener("click", closeSidebar);
+
+  // Close sidebar on nav link click (mobile)
+  sidebar && sidebar.querySelectorAll("a").forEach(function (link) {
+    link.addEventListener("click", function () {
+      if (window.innerWidth < 992) closeSidebar();
+    });
+  });
+
+
   const revenueCanvas = document.getElementById("revenueChart");
   if (revenueCanvas && typeof revenueLabels !== "undefined") {
     const ctx = revenueCanvas.getContext("2d");
