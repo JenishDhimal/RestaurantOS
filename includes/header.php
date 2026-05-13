@@ -16,9 +16,10 @@ $today = date('D, d M Y');
   <link href="/assets/css/app.css" rel="stylesheet">
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="app-layout">
 
-  <nav class="sidebar">
+  <nav class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <span class="brand-icon"><i class="fa-solid fa-utensils"></i></span>
       <span class="brand-name">RestaurantOS</span>
@@ -88,9 +89,14 @@ $today = date('D, d M Y');
 
   <div class="main-content">
     <header class="topbar">
-      <div>
-        <div class="topbar-title"><?= htmlspecialchars($pageTitle) ?></div>
-        <div class="topbar-sub"><?= htmlspecialchars($pageSubtitle ?? '') ?></div>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <button class="topbar-menu-btn" id="sidebarToggle" aria-label="Toggle menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div style="min-width:0;">
+          <div class="topbar-title"><?= htmlspecialchars($pageTitle) ?></div>
+          <div class="topbar-sub"><?= htmlspecialchars($pageSubtitle ?? '') ?></div>
+        </div>
       </div>
       <div class="topbar-actions">
         <span class="topbar-date"><?= htmlspecialchars($today) ?></span>
