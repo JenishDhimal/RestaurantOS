@@ -1,18 +1,26 @@
 document.addEventListener("DOMContentLoaded", function () {
   const revenueCanvas = document.getElementById("revenueChart");
-  if (revenueCanvas && typeof weekLabels !== "undefined") {
+  if (revenueCanvas && typeof revenueLabels !== "undefined") {
+    const ctx = revenueCanvas.getContext("2d");
+    const gradient = ctx.createLinearGradient(0, 0, 0, 160);
+    gradient.addColorStop(0, "rgba(232,93,4,0.18)");
+    gradient.addColorStop(1, "rgba(232,93,4,0.01)");
     new Chart(revenueCanvas, {
-      type: "bar",
+      type: "line",
       data: {
-        labels: weekLabels,
+        labels: revenueLabels,
         datasets: [
           {
             label: "Revenue ($)",
-            data: weekValues,
-            backgroundColor: "rgba(232, 93, 4, 0.15)",
+            data: revenueValues,
+            backgroundColor: gradient,
             borderColor: "#E85D04",
             borderWidth: 2,
-            borderRadius: 6,
+            fill: true,
+            tension: 0.4,
+            pointRadius: revenueLabels.length > 30 ? 0 : 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: "#E85D04",
           },
         ],
       },
@@ -31,7 +39,11 @@ document.addEventListener("DOMContentLoaded", function () {
             grid: { color: "rgba(0,0,0,0.05)" },
             ticks: { callback: (val) => "$" + val, font: { size: 11 } },
           },
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          x: {
+            grid: { display: false },
+            ticks: { display: false },
+            border: { display: false },
+          },
         },
       },
     });
