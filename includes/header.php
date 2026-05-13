@@ -55,6 +55,9 @@ $today = date('D, d M Y');
       <li><a href="/payments.php" class="<?= $activePage === 'payments' ? 'active' : '' ?>">
         <i class="fa-solid fa-credit-card"></i> Payments
       </a></li>
+      <li><a href="/expenses.php" class="<?= $activePage === 'expenses' ? 'active' : '' ?>">
+        <i class="fa-solid fa-arrow-trend-down"></i> Expenses
+      </a></li>
       <?php endif; ?>
       <?php if (is_admin()): ?>
       <li><a href="/menu.php" class="<?= $activePage === 'menu' ? 'active' : '' ?>">
