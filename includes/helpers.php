@@ -7,11 +7,11 @@ function get_settings(): array {
 }
 
 function time_ago(string $datetime): string {
-    $diff = time() - strtotime($datetime);
-    if ($diff < 60)    return $diff . 's ago';
-    if ($diff < 3600)  return floor($diff / 60) . ' min ago';
-    if ($diff < 86400) return floor($diff / 3600) . ' hr ago';
-    return date('d M', strtotime($datetime));
+    $ts = strtotime($datetime);
+    if (date('Y-m-d', $ts) === date('Y-m-d')) {
+        return date('g:i A', $ts);
+    }
+    return date('d M, g:i A', $ts);
 }
 
 function status_class(string $status): string {
